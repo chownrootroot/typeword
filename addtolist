@@ -1,0 +1,10 @@
+#!/bin/bash
+
+for strFile in *; do
+	strWord=$(printf "%s" "${strFile}" | awk -F "." '{print $1}')
+	strWord=${strWord^^}
+	printf "\n%s;%s" "${strWord}" "${strFile}"
+done
+
+exit 0
+

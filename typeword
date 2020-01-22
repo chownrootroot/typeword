@@ -1,0 +1,162 @@
+#!/bin/bash
+
+##
+# Add ranom mode
+# Add list argument mode
+# Change to zenity
+# Add help session
+# Add logging
+##
+
+help_text ()
+{
+	clear
+	printf "%s\n" "TYPEWORD - A script used to learn machine typing"
+	printf "%s\n\n" "Usage: typeword -[PARAMETER] [VALUE]"
+	printf "%s - %s\n" "-r" "Random mode. Objects of list will be shown randomly & infintely."
+	printf "%s - %s\n" "-f" "Manual object list file. Example '-f .planets'."
+	printf "%s - %s\n" "-c" "Check all images in list. Will error exit if not found."
+	printf "%s - %s\n" "-t" "Terminal mode. Input is made in terminal instead of entry dialog box."
+	printf "%s - %s\n" "-h" "Show this help text."
+}
+	
+# Variables
+# Input settings
+iRandomMode=0
+iCheckImages=0
+strObjFile="./.object_list"
+strImagePath="./.images"
+iTerminalMode=0
+strObject=
+strPicture=
+iPicturePID=
+strTempImage=
+iNumberOfImages=0
+iCountStop=0
+iImagesShown=0
+
+# Passed arguments
+until [ -z ${1} ]; do
+	if [ "${1}" = "-r" ]; then
+		iRandomMode=1
+	elif [ "${1}" = "-f" ]; then
+		shift
+		strObjFile=${1}
+	elif [ "${1}" = "-m" ]; then
+		shift
+		iCountStop=${1}
+	elif [ "${1}" = "-c" ]; then
+		iCheckImages=1
+	elif [ "${1}" = "-t" ]; then
+		iTerminalMode=1
+	elif [ "${1}" = "-h" ]; then
+		help_text
+		exit 0
+	fi
+	shift
+done
+
+# Check variables
+if [ -f "${strObjFile}" ]; then
+	printf "%s\n" "Object file exists."
+else
+	printf "%s\n" "Object file does not exist."
+	exit 1
+fi
+
+# Workvars
+iLastLine=$(cat ${strObjFile} | wc -l)
+
+if [ "${iRandomMode}" = "1" ]; then
+	iLineNr=$(($RANDOM % ${iLastLine} + 1))		# Randomize words
+else
+	iLineNr=1									# Words from top to bottom
+fi			
+
+
+if [ "${iCheckImages}" = "1" ]; then
+	cat ${strObjFile} | while read line; do
+		strTempImage=$(echo ${line} | awk -F ";" '{print $2}')
+		if [ -f "${strImagePath}/${strTempImage}" ]; then
+			iNumberOfImages=$((${iNumberOfImages}+1))
+			printf "%s\n" "File ${iNumberOfImages} - ${strTempImage} exists."
+		else
+			printf "%s\n" "Error. File ${strTempImage} does not exist. Exiting."
+			exit 1
+		fi
+	done
+	printf "All files exist.\n"
+	exit 0
+fi
+
+
+# Header
+printf "%s\n" "--------------------"
+printf "%s\n" "LÄR DIG SKRIVA"
+printf "%s\n\n\n" "--------------------"
+
+# Main loop
+while [ ${iLineNr} -le ${iLastLine} ]; do
+	# Read in current word
+	strObject=$(head -${iLineNr} ${strObjFile} | tail -1 | awk -F ";" '{print $1}')
+	strPicture=$(head -${iLineNr} ${strObjFile} | tail -1 | awk -F ";" '{print $2}')
+	# Speak & print
+	display ${strImagePath}/${strPicture}& &> /dev/null
+	sleep 1
+    iPicturePID=$(pidof display ${strImagePath}/${strPicture})
+	espeak -v sv "${strObject}" &> /dev/null
+    
+    # Read answer
+	if [ "${iTerminalMode}" = "1" ]; then
+		xdotool keydown alt key Tab; sleep 0,1; xdotool keyup alt
+		printf "%s >\n" "${strObject}"
+		read -p "" strAnswer
+	else
+		strAnswer=$(zenity --entry --title="Skriv ordet" --text="${strObject}")
+	fi
+	
+	if [ "${?}" != "0" ] || [ "${strAnswer}" = "xx" ]; then
+		# Exit on cancel
+		#espeak -v sv "Tack för att du ville spela. Vi ses en annan dag!" &> /dev/null
+		#kill ${iPicturePID}
+		#exit 5
+		# Next on cancel
+		espeak -v sv "Okej, då skippar vi den." &> /dev/null
+		strAnswer=${strObject}
+	fi
+	# Right
+	if [ "${strAnswer^^}" = "${strObject^^}" ]; then
+		espeak -v sv "Bravo" &> /dev/null
+		printf "%s\n%s\n\n" "Rätt" "Då tar vi nästa!"
+		kill ${iPicturePID}
+		if [ "${iRandomMode}" = "1" ]; then
+			iLineNr=$(($RANDOM % ${iLastLine} + 1))		# Randomize words	
+		else
+			iLineNr=$((${iLineNr}+1))					# Words from top to bottom
+		fi
+		iImagesShown=$((${iImagesShown}+1))
+		sleep 1
+		
+	# Wrong
+	else
+		espeak -v sv "Nej det var fel" &> /dev/null
+		printf "%s\n%s\n\n" "Fel" "Prova igen!"
+		kill ${iPicturePID}		
+		sleep 1
+	fi
+
+	if [ "${iCountStop}" -gt "0" ]; then
+		if [ "${iImagesShown}" -ge "${iCountStop}" ]; then
+			espeak -v sv "Nu är orden slut. Tack för att du ville spela. Vi ses en annan dag!" &> /dev/null
+			printf "%s\n" "Max antal bilder nådd. Avslutar."
+			exit 0
+		fi
+	fi
+	
+done
+
+# End of list graceful exit
+espeak -v sv "Nu är orden slut. Tack för att du ville spela. Vi ses en annan dag!" &> /dev/null
+printf "%s\n" "Nu är orden slut. Tack för att du ville spela. Vi ses en annan dag!"
+
+exit 0
