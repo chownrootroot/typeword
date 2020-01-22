@@ -115,13 +115,13 @@ while [ ${iLineNr} -le ${iLastLine} ]; do
 		strAnswer=$(zenity --entry --title="Skriv ordet" --text="${strObject}")
 	fi
 	
-	if [ "${?}" != "0" ] || [ "${strAnswer}" = "xx" ]; then
+	if [ "${?}" != "0" ] || [ "${strAnswer}" = "xx" ] || [ "${strAnswer}" = "XX" ]; then
 		# Exit on cancel
 		#espeak -v sv "Tack för att du ville spela. Vi ses en annan dag!" &> /dev/null
 		#kill ${iPicturePID}
 		#exit 5
 		# Next on cancel
-		espeak -v sv "Okej, då skippar vi den." &> /dev/null
+		espeak -v sv "Okej, då tar vi nästa." &> /dev/null
 		strAnswer=${strObject}
 	fi
 	# Right
